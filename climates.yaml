@@ -10,10 +10,9 @@
   fan_modes:
     auto: 1
     low: 2
-    medium_low: 3
     medium: 4
-    medium_high: 5
     high: 6
+    强劲档: 7
   hvac_off_value: 85
   hvac_on_value: 170
   hvac_off:
@@ -32,20 +31,20 @@
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
+    scan_interval: 7
+  fan_mode:
+    register: 330
+    register_type: holding
+    slave: 2
+    data_type: uint
+    scan_interval: 7
   temperature:
     register: 341
     register_type: holding
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
-  fan_mode:
-    register: 330
-    register_type: holding
-    slave: 2
-    data_type: uint
-    scan_interval: 30
+    scan_interval: 7
 
 - platform: zhimodbus
   hub: gree_bms
@@ -59,10 +58,9 @@
   fan_modes:
     auto: 1
     low: 2
-    medium_low: 3
     medium: 4
-    medium_high: 5
     high: 6
+    强劲档: 7
   hvac_off_value: 85
   hvac_on_value: 170
   hvac_off:
@@ -81,20 +79,20 @@
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
+    scan_interval: 7
+  fan_mode:
+    register: 580
+    register_type: holding
+    slave: 2
+    data_type: uint
+    scan_interval: 7
   temperature:
     register: 591
     register_type: holding
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
-  fan_mode:
-    register: 580
-    register_type: holding
-    slave: 2
-    data_type: uint
-    scan_interval: 30
+    scan_interval: 7
 
 - platform: zhimodbus
   hub: gree_bms
@@ -108,10 +106,9 @@
   fan_modes:
     auto: 1
     low: 2
-    medium_low: 3
     medium: 4
-    medium_high: 5
     high: 6
+    强劲档: 7
   hvac_off_value: 85
   hvac_on_value: 170
   hvac_off:
@@ -130,20 +127,20 @@
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
+    scan_interval: 7
+  fan_mode:
+    register: 830
+    register_type: holding
+    slave: 2
+    data_type: uint
+    scan_interval: 7
   temperature:
     register: 841
     register_type: holding
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
-  fan_mode:
-    register: 830
-    register_type: holding
-    slave: 2
-    data_type: uint
-    scan_interval: 30
+    scan_interval: 7
 
 - platform: zhimodbus
   hub: gree_bms
@@ -157,10 +154,9 @@
   fan_modes:
     auto: 1
     low: 2
-    medium_low: 3
     medium: 4
-    medium_high: 5
     high: 6
+    强劲档: 7
   hvac_off_value: 85
   hvac_on_value: 170
   hvac_off:
@@ -179,20 +175,20 @@
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
+    scan_interval: 7
+  fan_mode:
+    register: 1080
+    register_type: holding
+    slave: 2
+    data_type: uint
+    scan_interval: 7
   temperature:
     register: 1091
     register_type: holding
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
-  fan_mode:
-    register: 1080
-    register_type: holding
-    slave: 2
-    data_type: uint
-    scan_interval: 30
+    scan_interval: 7
 
 - platform: zhimodbus
   hub: gree_bms
@@ -204,14 +200,11 @@
     heat: 4
     auto: 5
   fan_modes:
-    auto: 1          # 自动档
-    low: 2           # 低风
-    medium_low: 3    # 中低风
-    medium: 4        # 中风
-    medium_high: 5   # 中高风
-    high: 6          # 高风
-    turbo: 8         # 强劲档
-
+    auto: 1
+    low: 2
+    medium: 4
+    high: 6
+    强劲档: 7
   hvac_off_value: 85
   hvac_on_value: 170
   hvac_off:
@@ -230,17 +223,17 @@
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
+    scan_interval: 7
+  fan_mode:
+    register: 1330
+    register_type: holding
+    slave: 2
+    data_type: uint
+    scan_interval: 7
   temperature:
     register: 1341
     register_type: holding
     slave: 2
     scale: 0.1
     data_type: uint
-    scan_interval: 30
-  fan_mode:
-    register: 1330
-    register_type: holding
-    slave: 2
-    data_type: uint
-    scan_interval: 30
+    scan_interval: 7
