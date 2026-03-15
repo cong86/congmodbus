@@ -22,7 +22,7 @@ import homeassistant.helpers.config_validation as cv
 
 
 _LOGGER = logging.getLogger(__name__)
-SCAN_INTERVAL = timedelta(seconds=30)
+SCAN_INTERVAL = timedelta(seconds=10)
 PENDING_SECONDS = 20
 
 CONF_AUX_HEAT_OFF_VALUE = "aux_heat_off_value"
@@ -194,6 +194,7 @@ class ClimateModbus:
                 continue
 
             self.regs[prop] = reg
+
 
     def has_valid_register(self, index):
         for prop in self.regs:
