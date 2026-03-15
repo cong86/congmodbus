@@ -140,7 +140,7 @@ def setup_platform(hass, conf, add_devices, discovery_info=None):
         entities.append(ZhiModbusClimate(bus, name[0] if isinstance(name, list) else name))
 
     bus.count = len(entities)
-    add_devices(entities, True)
+    add_devices(entities, False)
 
 
 class ClimateModbus:
