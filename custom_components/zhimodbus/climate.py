@@ -23,7 +23,7 @@ import homeassistant.helpers.config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=30)
-PENDING_SECONDS = 8
+PENDING_SECONDS = 20
 
 CONF_AUX_HEAT_OFF_VALUE = "aux_heat_off_value"
 CONF_AUX_HEAT_ON_VALUE = "aux_heat_on_value"
@@ -310,6 +310,10 @@ class ZhiModbusClimate(ClimateEntity):
     def _pending_valid(self, until_value):
         return until_value is not None and datetime.now() < until_value
 
+    def _set_pending_hvac(self, mode):
+        self._pending_hvac_mode = mode
+        self._pending_hvac_until = datetime.now() + timedelta(seconds=PENDING_SECONDS)
+
     @property
     def unique_id(self):
         from homeassistant.util import slugify
@@ -444,8 +448,8 @@ class ZhiModbusClimate(ClimateEntity):
             )
 
             if hvac_mode == HVACMode.OFF:
-                self._pending_hvac_mode = HVACMode.OFF
-                self._pending_hvac_until = datetime.now() + timedelta(seconds=PENDING_SECONDS)
+                self._set_pending_hvac(HVACMode.OFF)
+                self._values[REG_HVAC_OFF] = None
                 if REG_HVAC_MODE in self._bus.regs:
                     self._values[REG_HVAC_MODE] = None
                 self.async_write_ha_state()
@@ -456,11 +460,13 @@ class ZhiModbusClimate(ClimateEntity):
             _LOGGER.warning("Fix operation mode from %s to %s", hvac_mode, best_hvac_mode)
             hvac_mode = best_hvac_mode
 
-        self._pending_hvac_mode = hvac_mode
-        self._pending_hvac_until = datetime.now() + timedelta(seconds=PENDING_SECONDS)
+        self._set_pending_hvac(hvac_mode)
         self._last_on_operation = hvac_mode
 
         await self.set_mode(self._bus.hvac_modes, REG_HVAC_MODE, hvac_mode)
+        if REG_HVAC_OFF in self._bus.regs:
+            self._values[REG_HVAC_OFF] = None
+        self._values[REG_HVAC_MODE] = None
         self.async_write_ha_state()
 
     @property
@@ -474,15 +480,22 @@ class ZhiModbusClimate(ClimateEntity):
         _LOGGER.warning("Turn on %s", self.name)
         if REG_HVAC_OFF in self._bus.regs:
             await self.set_value(REG_HVAC_OFF, self._bus.hvac_on_value)
-            self._values[REG_HVAC_OFF] = self._bus.hvac_on_value
+            self._values[REG_HVAC_OFF] = None
+        on_mode = self._last_on_operation or self.best_hvac_mode or next(iter(self._bus.hvac_modes), HVACMode.OFF)
+        self._set_pending_hvac(on_mode)
+        if REG_HVAC_MODE in self._bus.regs:
+            self._values[REG_HVAC_MODE] = None
+        self.async_write_ha_state()
 
     async def async_turn_off(self):
         _LOGGER.warning("Turn off %s", self.name)
         if REG_HVAC_OFF in self._bus.regs:
             await self.set_value(REG_HVAC_OFF, self._bus.hvac_off_value)
-            self._values[REG_HVAC_OFF] = self._bus.hvac_off_value
-        self._pending_hvac_mode = None
-        self._pending_hvac_until = None
+            self._values[REG_HVAC_OFF] = None
+        self._set_pending_hvac(HVACMode.OFF)
+        if REG_HVAC_MODE in self._bus.regs:
+            self._values[REG_HVAC_MODE] = None
+        self.async_write_ha_state()
 
     async def async_set_fan_mode(self, fan_mode):
         if fan_mode in self._bus.fan_modes:
