@@ -7,7 +7,7 @@ https://github.com/Yonsm/ZhiModBus
 
 import logging
 import struct
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import voluptuous as vol
 
@@ -17,49 +17,49 @@ from homeassistant.const import CONF_NAME, CONF_SLAVE, CONF_OFFSET, CONF_STRUCTU
 from homeassistant.components.modbus.const import (
     DEFAULT_HUB, MODBUS_DOMAIN,
     CALL_TYPE_COIL, CALL_TYPE_REGISTER_HOLDING, CALL_TYPE_REGISTER_INPUT,
-    CALL_TYPE_WRITE_COIL
 )
 import homeassistant.helpers.config_validation as cv
 
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=30)
+PENDING_SECONDS = 8
 
-CONF_AUX_HEAT_OFF_VALUE = 'aux_heat_off_value'
-CONF_AUX_HEAT_ON_VALUE = 'aux_heat_on_value'
-CONF_COUNT = 'count'
-CONF_DATA_TYPE = 'data_type'
-CONF_FAN_MODES = 'fan_modes'
-CONF_HVAC_MODES = 'hvac_modes'
-CONF_HVAC_OFF_VALUE = 'hvac_off_value'
-CONF_HVAC_ON_VALUE = 'hvac_on_value'
-CONF_PRESET_MODES = 'preset_mode'
-CONF_REGISTER = 'register'
-CONF_REGISTER_TYPE = 'register_type'
-CONF_REGISTERS = 'registers'
-CONF_REVERSE_ORDER = 'reverse_order'
-CONF_SCALE = 'scale'
-CONF_SWING_MODES = 'swing_modes'
+CONF_AUX_HEAT_OFF_VALUE = "aux_heat_off_value"
+CONF_AUX_HEAT_ON_VALUE = "aux_heat_on_value"
+CONF_COUNT = "count"
+CONF_DATA_TYPE = "data_type"
+CONF_FAN_MODES = "fan_modes"
+CONF_HVAC_MODES = "hvac_modes"
+CONF_HVAC_OFF_VALUE = "hvac_off_value"
+CONF_HVAC_ON_VALUE = "hvac_on_value"
+CONF_PRESET_MODES = "preset_mode"
+CONF_REGISTER = "register"
+CONF_REGISTER_TYPE = "register_type"
+CONF_REGISTERS = "registers"
+CONF_REVERSE_ORDER = "reverse_order"
+CONF_SCALE = "scale"
+CONF_SWING_MODES = "swing_modes"
 
-REG_AUX_HEAT = 'aux_heat'
-REG_FAN_MODE = 'fan_mode'
-REG_HUMIDITY = 'humidity'
-REG_HVAC_MODE = 'hvac_mode'
-REG_HVAC_OFF = 'hvac_off'
-REG_PRESET_MODE = 'preset_mode'
-REG_SWING_MODE = 'swing_mode'
-REG_TARGET_HUMIDITY = 'target_humidity'
-REG_TARGET_TEMPERATURE = 'target_temperature'
-REG_TEMPERATURE = 'temperature'
+REG_AUX_HEAT = "aux_heat"
+REG_FAN_MODE = "fan_mode"
+REG_HUMIDITY = "humidity"
+REG_HVAC_MODE = "hvac_mode"
+REG_HVAC_OFF = "hvac_off"
+REG_PRESET_MODE = "preset_mode"
+REG_SWING_MODE = "swing_mode"
+REG_TARGET_HUMIDITY = "target_humidity"
+REG_TARGET_TEMPERATURE = "target_temperature"
+REG_TEMPERATURE = "temperature"
 
-REGISTER_TYPE_HOLDING = 'holding'
-REGISTER_TYPE_INPUT = 'input'
-REGISTER_TYPE_COIL = 'coil'
+REGISTER_TYPE_HOLDING = "holding"
+REGISTER_TYPE_INPUT = "input"
+REGISTER_TYPE_COIL = "coil"
 
-DATA_TYPE_INT = 'int'
-DATA_TYPE_UINT = 'uint'
-DATA_TYPE_FLOAT = 'float'
-DATA_TYPE_CUSTOM = 'custom'
+DATA_TYPE_INT = "int"
+DATA_TYPE_UINT = "uint"
+DATA_TYPE_FLOAT = "float"
+DATA_TYPE_CUSTOM = "custom"
 
 SUPPORTED_FEATURES = {
     REG_FAN_MODE: ClimateEntityFeature.FAN_MODE,
@@ -83,8 +83,8 @@ HVAC_ACTIONS = {
     HVACMode.FAN_ONLY: HVACAction.FAN,
 }
 
-DEFAULT_NAME = 'ModBus'
-CONF_HUB = 'hub'
+DEFAULT_NAME = "ModBus"
+CONF_HUB = "hub"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_HUB, default=DEFAULT_HUB): cv.string,
@@ -124,7 +124,13 @@ def setup_platform(hass, conf, add_devices, discovery_info=None):
     for index in range(100):
         if not bus.has_valid_register(index):
             break
-        entities.append(ZhiModbusClimate(bus, name[index] if isinstance(name, list) else (name + str(index + 1)), index))
+        entities.append(
+            ZhiModbusClimate(
+                bus,
+                name[index] if isinstance(name, list) else (name + str(index + 1)),
+                index,
+            )
+        )
 
     if not entities:
         for prop in bus.regs:
@@ -137,12 +143,12 @@ def setup_platform(hass, conf, add_devices, discovery_info=None):
     add_devices(entities, True)
 
 
-class ClimateModbus():
-
+class ClimateModbus:
     def __init__(self, hass, conf):
         self.error = 0
         self.hass = hass
-        self.hub = self.hass.data[MODBUS_DOMAIN][conf.get(CONF_HUB)]
+        self.hub_name = conf.get(CONF_HUB)
+        self.hub = self.hass.data[MODBUS_DOMAIN][self.hub_name]
         self.unit = hass.config.units.temperature_unit
         self.fan_modes = conf.get(CONF_FAN_MODES)
         self.hvac_modes = conf.get(CONF_HVAC_MODES)
@@ -153,9 +159,9 @@ class ClimateModbus():
         self.aux_heat_on_value = conf.get(CONF_AUX_HEAT_ON_VALUE)
         self.aux_heat_off_value = conf.get(CONF_AUX_HEAT_OFF_VALUE)
 
-        data_types = {DATA_TYPE_INT: {1: 'h', 2: 'i', 4: 'q'}}
-        data_types[DATA_TYPE_UINT] = {1: 'H', 2: 'I', 4: 'Q'}
-        data_types[DATA_TYPE_FLOAT] = {1: 'e', 2: 'f', 4: 'd'}
+        data_types = {DATA_TYPE_INT: {1: "h", 2: "i", 4: "q"}}
+        data_types[DATA_TYPE_UINT] = {1: "H", 2: "I", 4: "Q"}
+        data_types[DATA_TYPE_FLOAT] = {1: "e", 2: "f", 4: "d"}
 
         self.regs = {}
         for prop in SUPPORTED_FEATURES:
@@ -167,7 +173,9 @@ class ClimateModbus():
             data_type = reg.get(CONF_DATA_TYPE)
             if data_type != DATA_TYPE_CUSTOM:
                 try:
-                    reg[CONF_STRUCTURE] = '>{}'.format(data_types[DATA_TYPE_INT if data_type is None else data_type][count])
+                    reg[CONF_STRUCTURE] = ">{}".format(
+                        data_types[DATA_TYPE_INT if data_type is None else data_type][count]
+                    )
                 except KeyError:
                     _LOGGER.error("Unable to detect data type for %s", prop)
                     continue
@@ -179,13 +187,15 @@ class ClimateModbus():
                 continue
 
             if count * 2 != size:
-                _LOGGER.error("Structure size (%d bytes) mismatch registers count (%d words)", size, count)
+                _LOGGER.error(
+                    "Structure size (%d bytes) mismatch registers count (%d words)",
+                    size, count
+                )
                 continue
 
             self.regs[prop] = reg
 
     def has_valid_register(self, index):
-        """Check valid register."""
         for prop in self.regs:
             registers = self.regs[prop].get(CONF_REGISTERS)
             if not registers or index >= len(registers):
@@ -193,13 +203,12 @@ class ClimateModbus():
         return True
 
     def reset(self):
-        """Initialize USR module"""
         _LOGGER.warning("Reset %s", self.hub._client)
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(5)
         s.connect((self.hub._pb_params["host"], self.hub._pb_params["port"]))
-        s.sendall(b'\x55\xAA\x55\x00\x25\x80\x03\xA8')
+        s.sendall(b"\x55\xAA\x55\x00\x25\x80\x03\xA8")
         s.close()
 
     async def reconnect(self, now=None):
@@ -217,7 +226,6 @@ class ClimateModbus():
         async_call_later(self.hass, 1, self.reconnect)
 
     def reg_basic_info(self, reg, index):
-        """Get register info."""
         register_type = reg.get(CONF_REGISTER_TYPE)
         register = reg[CONF_REGISTER] if index == -1 else reg[CONF_REGISTERS][index]
         slave = reg.get(CONF_SLAVE, 1)
@@ -229,23 +237,25 @@ class ClimateModbus():
         reg = self.regs[prop]
         register_type, slave, register, scale, offset = self.reg_basic_info(reg, index)
         count = reg.get(CONF_COUNT, 1)
+
         if register_type == REGISTER_TYPE_COIL:
             result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_COIL)
             return bool(result.bits[0])
+
         if register_type == REGISTER_TYPE_INPUT:
             result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_INPUT)
         else:
             result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_HOLDING)
+
         registers = result.registers
         if reg.get(CONF_REVERSE_ORDER):
             registers.reverse()
-        byte_string = b''.join([x.to_bytes(2, byteorder='big') for x in registers])
+
+        byte_string = b"".join([x.to_bytes(2, byteorder="big") for x in registers])
         val = struct.unpack(reg[CONF_STRUCTURE], byte_string)[0]
-        value = scale * val + offset
-        return value
+        return scale * val + offset
 
     async def write_value(self, index, prop, value):
-        """Set property value."""
         reg = self.regs[prop]
         register_type, slave, register, scale, offset = self.reg_basic_info(reg, index)
 
@@ -254,7 +264,7 @@ class ClimateModbus():
                 "modbus",
                 "write_coil",
                 {
-                    "hub": "gree_bms",
+                    "hub": self.hub_name,
                     "slave": slave,
                     "address": register,
                     "state": bool(value),
@@ -267,7 +277,7 @@ class ClimateModbus():
                 "modbus",
                 "write_register",
                 {
-                    "hub": "gree_bms",
+                    "hub": self.hub_name,
                     "slave": slave,
                     "address": register,
                     "value": [val],
@@ -277,137 +287,165 @@ class ClimateModbus():
 
 
 class ZhiModbusClimate(ClimateEntity):
-    """Representation of a Modbus climate device."""
-
     _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, bus, name, index=-1):
-        """Initialize the climate device."""
         self._bus = bus
         self._name = name
         self._index = index
         self._values = {}
         self._last_on_operation = None
         self._skip_update = False
+
+        self._pending_hvac_mode = None
+        self._pending_target_temperature = None
+        self._pending_hvac_until = None
+        self._pending_target_temperature_until = None
+
         features = ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
         for prop in self._bus.regs:
             features |= SUPPORTED_FEATURES[prop]
         self._attr_supported_features = features
 
+    def _pending_valid(self, until_value):
+        return until_value is not None and datetime.now() < until_value
+
     @property
     def unique_id(self):
         from homeassistant.util import slugify
-        return self.__class__.__name__.lower() + '.' + slugify(self.name)
+        return self.__class__.__name__.lower() + "." + slugify(self.name)
 
     @property
     def name(self):
-        """Return the name of the climate device."""
         return self._name
 
     @property
     def temperature_unit(self):
-        """Return the unit of measurement."""
         return self._bus.unit
 
     @property
     def target_temperature_step(self):
-        """Return the supported step of target temperature."""
         return 1
 
     @property
     def current_temperature(self):
-        """Return the current temperature."""
         return self.get_value(REG_TEMPERATURE)
 
     @property
     def target_temperature(self):
-        """Return the temperature we try to reach."""
-        return self.get_value(REG_TARGET_TEMPERATURE)
+        real_value = self.get_value(REG_TARGET_TEMPERATURE)
+        pending_value = self._pending_target_temperature
+        if pending_value is not None and self._pending_valid(self._pending_target_temperature_until):
+            if real_value == pending_value:
+                self._pending_target_temperature = None
+                self._pending_target_temperature_until = None
+                return real_value
+            return pending_value
+
+        self._pending_target_temperature = None
+        self._pending_target_temperature_until = None
+        if real_value is not None:
+            return real_value
+
+        return None
 
     @property
     def current_humidity(self):
-        """Return the current humidity."""
         return self.get_value(REG_HUMIDITY)
 
     @property
     def target_humidity(self):
-        """Return the humidity we try to reach."""
         return self.get_value(REG_TARGET_HUMIDITY)
 
     @property
     def hvac_action(self):
-        """Return current operation ie. heat, cool, idle."""
         return HVAC_ACTIONS[self.hvac_mode]
 
     @property
     def hvac_mode(self):
+        real_mode = None
         if REG_HVAC_OFF in self._bus.regs:
-            if self.get_value(REG_HVAC_OFF) == self._bus.hvac_off_value:
-                return HVACMode.OFF
-        hvac_mode = self.get_mode(self._bus.hvac_modes, REG_HVAC_MODE) or HVACMode.OFF
-        if hvac_mode != HVACMode.OFF:
-            self._last_on_operation = hvac_mode
-        return hvac_mode
+            off_value = self.get_value(REG_HVAC_OFF)
+            if off_value == self._bus.hvac_off_value:
+                real_mode = HVACMode.OFF
+
+        if real_mode is None:
+            hvac_mode = self.get_mode(self._bus.hvac_modes, REG_HVAC_MODE)
+            if hvac_mode is not None:
+                if hvac_mode != HVACMode.OFF:
+                    self._last_on_operation = hvac_mode
+                real_mode = hvac_mode
+
+        pending_mode = self._pending_hvac_mode
+        if pending_mode is not None and self._pending_valid(self._pending_hvac_until):
+            if real_mode == pending_mode:
+                self._pending_hvac_mode = None
+                self._pending_hvac_until = None
+                return real_mode
+            return pending_mode
+
+        self._pending_hvac_mode = None
+        self._pending_hvac_until = None
+        if real_mode is not None:
+            return real_mode
+
+        return self._last_on_operation or HVACMode.OFF
 
     @property
     def hvac_modes(self):
-        """Return the list of available operation modes."""
         return [HVACMode.OFF] + list(self._bus.hvac_modes)
 
     @property
     def fan_mode(self):
-        """Return the fan setting."""
         return self.get_mode(self._bus.fan_modes, REG_FAN_MODE)
 
     @property
     def fan_modes(self):
-        """Return the list of available fan modes."""
         return list(self._bus.fan_modes)
 
     @property
     def swing_mode(self):
-        """Return the swing setting."""
         return self.get_mode(self._bus.swing_modes, REG_SWING_MODE)
 
     @property
     def swing_modes(self):
-        """List of available swing modes."""
         return list(self._bus.swing_modes)
 
     @property
     def preset_mode(self):
-        """Return preset mode setting."""
         return self.get_value(REG_PRESET_MODE)
 
     @property
     def preset_modes(self):
-        """List of available swing modes."""
         return list(self._bus.preset_modes)
 
     @property
     def is_aux_heat(self):
-        """Return true if aux heat is on."""
         return self.get_value(REG_AUX_HEAT) == self._bus.aux_heat_on_value
 
     async def async_set_temperature(self, **kwargs):
-        """Set new target temperatures."""
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is not None:
-            await self.set_value(REG_TARGET_TEMPERATURE, temperature)
+            self._pending_target_temperature = temperature
+            self._pending_target_temperature_until = datetime.now() + timedelta(seconds=PENDING_SECONDS)
+            _LOGGER.debug("Write %s: %s = %s", self.name, REG_TARGET_TEMPERATURE, temperature)
+            await self._bus.write_value(self._index, REG_TARGET_TEMPERATURE, temperature)
+            self._values[REG_TARGET_TEMPERATURE] = None
+            self.async_write_ha_state()
 
     async def async_set_humidity(self, humidity):
-        """Set new target humidity."""
         await self.set_value(REG_TARGET_HUMIDITY, humidity)
 
     async def async_set_hvac_mode(self, hvac_mode):
-        """Set new hvac mode."""
         if REG_HVAC_OFF in self._bus.regs:
             await self.set_value(
                 REG_HVAC_OFF,
-                self._bus.hvac_off_value if hvac_mode == HVACMode.OFF else self._bus.hvac_on_value
+                self._bus.hvac_off_value if hvac_mode == HVACMode.OFF else self._bus.hvac_on_value,
             )
 
             if hvac_mode == HVACMode.OFF:
+                self._pending_hvac_mode = HVACMode.OFF
+                self._pending_hvac_until = datetime.now() + timedelta(seconds=PENDING_SECONDS)
                 if REG_HVAC_MODE in self._bus.regs:
                     self._values[REG_HVAC_MODE] = None
                 self.async_write_ha_state()
@@ -417,6 +455,10 @@ class ZhiModbusClimate(ClimateEntity):
             best_hvac_mode = self.best_hvac_mode
             _LOGGER.warning("Fix operation mode from %s to %s", hvac_mode, best_hvac_mode)
             hvac_mode = best_hvac_mode
+
+        self._pending_hvac_mode = hvac_mode
+        self._pending_hvac_until = datetime.now() + timedelta(seconds=PENDING_SECONDS)
+        self._last_on_operation = hvac_mode
 
         await self.set_mode(self._bus.hvac_modes, REG_HVAC_MODE, hvac_mode)
         self.async_write_ha_state()
@@ -429,49 +471,50 @@ class ZhiModbusClimate(ClimateEntity):
         return None
 
     async def async_turn_on(self):
-        """Turn on."""
         _LOGGER.warning("Turn on %s", self.name)
-
         if REG_HVAC_OFF in self._bus.regs:
             await self.set_value(REG_HVAC_OFF, self._bus.hvac_on_value)
             self._values[REG_HVAC_OFF] = self._bus.hvac_on_value
 
     async def async_turn_off(self):
-        """Turn off."""
         _LOGGER.warning("Turn off %s", self.name)
-
         if REG_HVAC_OFF in self._bus.regs:
             await self.set_value(REG_HVAC_OFF, self._bus.hvac_off_value)
             self._values[REG_HVAC_OFF] = self._bus.hvac_off_value
+        self._pending_hvac_mode = None
+        self._pending_hvac_until = None
 
     async def async_set_fan_mode(self, fan_mode):
-        """Set new fan mode."""
-        await self.set_mode(self._bus.fan_modes, REG_FAN_MODE, fan_mode)
+        if fan_mode in self._bus.fan_modes:
+            value = self._bus.fan_modes[fan_mode]
+            await self._bus.write_value(self._index, REG_FAN_MODE, value)
+            self._values[REG_FAN_MODE] = value
+            self.async_write_ha_state()
+            return
+        _LOGGER.error("Invalid fan mode %s for %s/%s", fan_mode, self._name, REG_FAN_MODE)
 
     async def async_set_swing_mode(self, swing_mode):
-        """Set new swing mode."""
         await self.set_mode(self._bus.swing_modes, REG_SWING_MODE, swing_mode)
 
     async def async_set_preset_mode(self, preset_mode):
-        """Set new hold mode."""
         await self.set_value(REG_PRESET_MODE, preset_mode)
 
     async def async_turn_aux_heat_on(self):
-        """Turn auxiliary heater on."""
         await self.set_value(REG_AUX_HEAT, self._bus.aux_heat_on_value)
 
     async def async_turn_aux_heat_off(self):
-        """Turn auxiliary heater off."""
         await self.set_value(REG_AUX_HEAT, self._bus.aux_heat_off_value)
 
     async def async_update(self):
-        """Update state."""
         if self._skip_update:
             self._skip_update = False
             _LOGGER.debug("Skip update on %s", self._name)
             return
 
         for prop in self._bus.regs:
+            if prop == REG_FAN_MODE:
+                continue
+
             try:
                 self._values[prop] = await self._bus.read_value(self._index, prop)
             except Exception:
@@ -479,25 +522,27 @@ class ZhiModbusClimate(ClimateEntity):
                 self._bus.exception()
                 _LOGGER.debug("Exception %d on %s/%s", self._bus.error, self._name, prop)
                 return
+
         self._bus.error = 0
         self._attr_available = True
 
     def get_value(self, prop):
-        """Get property value."""
         return self._values.get(prop)
 
     async def set_value(self, prop, value):
-        """Set property value."""
-        _LOGGER.debug("Write %s: %s = %f", self.name, prop, value)
+        _LOGGER.debug("Write %s: %s = %s", self.name, prop, value)
         await self._bus.write_value(self._index, prop, value)
         self._values[prop] = value
 
     def get_mode(self, modes, prop):
         value = self.get_value(prop)
-        if value is not None:
-            for k, v in modes.items():
-                if v == value:
-                    return k
+        if value is None:
+            return None
+
+        for k, v in modes.items():
+            if v == value:
+                return k
+
         _LOGGER.error("Invalid value %s for %s/%s", value, self._name, prop)
         return None
 
