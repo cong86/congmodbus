@@ -1,0 +1,209 @@
+- name: gree_bms
+  type: tcp
+  host: 192.168.1.100
+  baudrate: 9600
+  port: 502
+  delay: 1
+  timeout: 8
+  message_wait_milliseconds: 200
+
+  sensors:
+    # ----------------- 10 号 -----------------
+    - name: "格力10_模式原始值"
+      unique_id: gree_10_mode_raw
+      slave: 2
+      address: 328
+      input_type: holding
+      data_type: uint16
+      scan_interval: 30
+
+    - name: "格力10_设定温度"
+      unique_id: gree_10_target_temp
+      slave: 2
+      address: 329
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      scan_interval: 30
+
+    - name: "格力10_室温"
+      unique_id: gree_10_room_temp
+      slave: 2
+      address: 341
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      state_class: measurement
+      scan_interval: 30
+
+    - name: "格力10_风速"
+      unique_id: gree_10_fan_speed
+      slave: 2
+      address: 330
+      input_type: holding
+      data_type: uint16
+      scan_interval: 30
+
+    # ----------------- 20 号 -----------------
+    - name: "格力20_模式原始值"
+      unique_id: gree_20_mode_raw
+      slave: 2
+      address: 578
+      input_type: holding
+      data_type: uint16
+      scan_interval: 35
+
+    - name: "格力20_设定温度"
+      unique_id: gree_20_target_temp
+      slave: 2
+      address: 579
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      scan_interval: 35
+
+    - name: "格力20_室温"
+      unique_id: gree_20_room_temp
+      slave: 2
+      address: 591
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      state_class: measurement
+      scan_interval: 35
+
+    - name: "格力20_风速"
+      unique_id: gree_20_fan_speed
+      slave: 2
+      address: 580
+      input_type: holding
+      data_type: uint16
+      scan_interval: 35
+
+    # ----------------- 30 号 -----------------
+    - name: "格力30_模式原始值"
+      unique_id: gree_30_mode_raw
+      slave: 2
+      address: 828
+      input_type: holding
+      data_type: uint16
+      scan_interval: 40
+
+    - name: "格力30_设定温度"
+      unique_id: gree_30_target_temp
+      slave: 2
+      address: 829
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      scan_interval: 40
+
+    - name: "格力30_室温"
+      unique_id: gree_30_room_temp
+      slave: 2
+      address: 841
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      state_class: measurement
+      scan_interval: 40
+
+    - name: "格力30_风速"
+      unique_id: gree_30_fan_speed
+      slave: 2
+      address: 830
+      input_type: holding
+      data_type: uint16
+      scan_interval: 40
+
+    # ----------------- 40 号 -----------------
+    - name: "格力40_模式原始值"
+      unique_id: gree_40_mode_raw
+      slave: 2
+      address: 1078
+      input_type: holding
+      data_type: uint16
+      scan_interval: 45
+
+    - name: "格力40_设定温度"
+      unique_id: gree_40_target_temp
+      slave: 2
+      address: 1079
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      scan_interval: 45
+
+    - name: "格力40_室温"
+      unique_id: gree_40_room_temp
+      slave: 2
+      address: 1091
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      state_class: measurement
+      scan_interval: 45
+
+    - name: "格力40_风速"
+      unique_id: gree_40_fan_speed
+      slave: 2
+      address: 1080
+      input_type: holding
+      data_type: uint16
+      scan_interval: 45
+
+    # ----------------- 50 号 -----------------
+    - name: "格力50_模式原始值"
+      unique_id: gree_50_mode_raw
+      slave: 2
+      address: 1328
+      input_type: holding
+      data_type: uint16
+      scan_interval: 50
+
+    - name: "格力50_设定温度"
+      unique_id: gree_50_target_temp
+      slave: 2
+      address: 1329
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      scan_interval: 50
+
+    - name: "格力50_室温"
+      unique_id: gree_50_room_temp
+      slave: 2
+      address: 1341
+      input_type: holding
+      data_type: uint16
+      scale: 0.1
+      precision: 1
+      unit_of_measurement: "°C"
+      state_class: measurement
+      scan_interval: 50
+
+    - name: "格力50_风速"
+      unique_id: gree_50_fan_speed
+      slave: 2
+      address: 1330
+      input_type: holding
+      data_type: uint16
+      scan_interval: 50
