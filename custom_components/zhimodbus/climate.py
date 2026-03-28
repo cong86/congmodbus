@@ -6,6 +6,7 @@ https://github.com/Yonsm/ZhiModBus
 """
 
 import logging
+import asyncio
 import struct
 from datetime import timedelta, datetime
 
@@ -149,6 +150,7 @@ class ClimateModbus:
         self.hass = hass
         self.hub_name = conf.get(CONF_HUB)
         self.hub = self.hass.data[MODBUS_DOMAIN][self.hub_name]
+        self._io_lock = asyncio.Lock()
         self.unit = hass.config.units.temperature_unit
         self.fan_modes = conf.get(CONF_FAN_MODES)
         self.hvac_modes = conf.get(CONF_HVAC_MODES)
@@ -239,14 +241,15 @@ class ClimateModbus:
         register_type, slave, register, scale, offset = self.reg_basic_info(reg, index)
         count = reg.get(CONF_COUNT, 1)
 
-        if register_type == REGISTER_TYPE_COIL:
-            result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_COIL)
-            return bool(result.bits[0])
+        async with self._io_lock:
+            if register_type == REGISTER_TYPE_COIL:
+                result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_COIL)
+                return bool(result.bits[0])
 
-        if register_type == REGISTER_TYPE_INPUT:
-            result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_INPUT)
-        else:
-            result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_HOLDING)
+            if register_type == REGISTER_TYPE_INPUT:
+                result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_INPUT)
+            else:
+                result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_HOLDING)
 
         registers = result.registers
         if reg.get(CONF_REVERSE_ORDER):
@@ -260,31 +263,32 @@ class ClimateModbus:
         reg = self.regs[prop]
         register_type, slave, register, scale, offset = self.reg_basic_info(reg, index)
 
-        if register_type == REGISTER_TYPE_COIL:
-            await self.hass.services.async_call(
-                "modbus",
-                "write_coil",
-                {
-                    "hub": self.hub_name,
-                    "slave": slave,
-                    "address": register,
-                    "state": bool(value),
-                },
-                blocking=True,
-            )
-        else:
-            val = int((value - offset) / scale)
-            await self.hass.services.async_call(
-                "modbus",
-                "write_register",
-                {
-                    "hub": self.hub_name,
-                    "slave": slave,
-                    "address": register,
-                    "value": [val],
-                },
-                blocking=True,
-            )
+        async with self._io_lock:
+            if register_type == REGISTER_TYPE_COIL:
+                await self.hass.services.async_call(
+                    "modbus",
+                    "write_coil",
+                    {
+                        "hub": self.hub_name,
+                        "slave": slave,
+                        "address": register,
+                        "state": bool(value),
+                    },
+                    blocking=True,
+                )
+            else:
+                val = int((value - offset) / scale)
+                await self.hass.services.async_call(
+                    "modbus",
+                    "write_register",
+                    {
+                        "hub": self.hub_name,
+                        "slave": slave,
+                        "address": register,
+                        "value": [val],
+                    },
+                    blocking=True,
+                )
 
 
 class ZhiModbusClimate(ClimateEntity):
