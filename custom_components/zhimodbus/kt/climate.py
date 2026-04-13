@@ -1,12 +1,11 @@
-"""ZhiModbus 温控平台。
+"""
+Platform for a Generic Modbus Thermostat.
 
-用于在 Home Assistant 中接入基于 Modbus 的温控设备，
-支持温度读写、模式切换，以及在通信异常时的轮询熔断与恢复。
+For more details about this platform, please refer to the documentation at
+https://github.com/Yonsm/ZhiModBus
 """
 
 import logging
-import asyncio
-import time
 import struct
 from datetime import timedelta, datetime
 
@@ -21,16 +20,10 @@ from homeassistant.components.modbus.const import (
 )
 import homeassistant.helpers.config_validation as cv
 
-from .runtime import get_polling_runtime
-
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=10)
-PARALLEL_UPDATES = 1
 PENDING_SECONDS = 20
-# 通讯失败后的重试基准秒数与最大退避上限。
-DEFAULT_POLL_RETRY_SECONDS = 20
-DEFAULT_MAX_POLL_RETRY_SECONDS = 120
 
 CONF_AUX_HEAT_OFF_VALUE = "aux_heat_off_value"
 CONF_AUX_HEAT_ON_VALUE = "aux_heat_on_value"
@@ -40,8 +33,6 @@ CONF_FAN_MODES = "fan_modes"
 CONF_HVAC_MODES = "hvac_modes"
 CONF_HVAC_OFF_VALUE = "hvac_off_value"
 CONF_HVAC_ON_VALUE = "hvac_on_value"
-CONF_MAX_POLL_RETRY_SECONDS = "max_poll_retry_seconds"
-CONF_POLL_RETRY_SECONDS = "poll_retry_seconds"
 CONF_PRESET_MODES = "preset_mode"
 CONF_REGISTER = "register"
 CONF_REGISTER_TYPE = "register_type"
@@ -94,7 +85,6 @@ HVAC_ACTIONS = {
 
 DEFAULT_NAME = "ModBus"
 CONF_HUB = "hub"
-DOMAIN = "zhimodbus"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_HUB, default=DEFAULT_HUB): cv.string,
@@ -108,12 +98,6 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_AUX_HEAT_ON_VALUE, default=1): int,
     vol.Optional(CONF_HVAC_OFF_VALUE, default=0): int,
     vol.Optional(CONF_HVAC_ON_VALUE, default=1): int,
-    vol.Optional(CONF_POLL_RETRY_SECONDS, default=DEFAULT_POLL_RETRY_SECONDS): vol.All(
-        vol.Coerce(int), vol.Range(min=5)
-    ),
-    vol.Optional(CONF_MAX_POLL_RETRY_SECONDS, default=DEFAULT_MAX_POLL_RETRY_SECONDS): vol.All(
-        vol.Coerce(int), vol.Range(min=5)
-    ),
 
     vol.Optional(REG_AUX_HEAT): dict,
     vol.Optional(REG_FAN_MODE): dict,
@@ -129,7 +113,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 
 
 def setup_platform(hass, conf, add_devices, discovery_info=None):
-    """初始化 Modbus 温控平台并创建实体。"""
+    """Set up the Modbus Thermostat Platform."""
     name = conf.get(CONF_NAME)
     bus = ClimateModbus(hass, conf)
     if not bus.regs:
@@ -137,7 +121,6 @@ def setup_platform(hass, conf, add_devices, discovery_info=None):
         return
 
     entities = []
-    # 多设备场景：根据寄存器数组长度按索引生成实体。
     for index in range(100):
         if not bus.has_valid_register(index):
             break
@@ -157,32 +140,15 @@ def setup_platform(hass, conf, add_devices, discovery_info=None):
         entities.append(ZhiModbusClimate(bus, name[0] if isinstance(name, list) else name))
 
     bus.count = len(entities)
-    status_name = bus.hub_name + " Polling"
-    bus.ensure_status_sensor(status_name)
     add_devices(entities, False)
 
 
 class ClimateModbus:
-    """封装 Modbus 读写与轮询状态控制。"""
-
     def __init__(self, hass, conf):
         self.error = 0
         self.hass = hass
         self.hub_name = conf.get(CONF_HUB)
         self.hub = self.hass.data[MODBUS_DOMAIN][self.hub_name]
-        # 同一 hub 下所有实体共享 I/O 锁，避免并发读写打架。
-        hub_locks = self.hass.data.setdefault("zhimodbus_io_locks", {})
-        self._io_lock = hub_locks.setdefault(self.hub_name, asyncio.Lock())
-        self._reconnect_pending = False
-        self._next_reconnect_at = 0.0
-        self._poll_probe_in_progress = False
-        self._poll_retry_seconds = conf.get(CONF_POLL_RETRY_SECONDS, DEFAULT_POLL_RETRY_SECONDS)
-        self._max_poll_retry_seconds = conf.get(CONF_MAX_POLL_RETRY_SECONDS, DEFAULT_MAX_POLL_RETRY_SECONDS)
-        if self._max_poll_retry_seconds < self._poll_retry_seconds:
-            self._max_poll_retry_seconds = self._poll_retry_seconds
-        self._poll_runtime = get_polling_runtime(hass, self.hub_name)
-        self._poll_runtime.retry_seconds = self._poll_retry_seconds
-        self._poll_runtime.max_retry_seconds = self._max_poll_retry_seconds
         self.unit = hass.config.units.temperature_unit
         self.fan_modes = conf.get(CONF_FAN_MODES)
         self.hvac_modes = conf.get(CONF_HVAC_MODES)
@@ -197,7 +163,6 @@ class ClimateModbus:
         data_types[DATA_TYPE_UINT] = {1: "H", 2: "I", 4: "Q"}
         data_types[DATA_TYPE_FLOAT] = {1: "e", 2: "f", 4: "d"}
 
-        # 解析并缓存所有功能对应的寄存器定义。
         self.regs = {}
         for prop in SUPPORTED_FEATURES:
             reg = conf.get(prop)
@@ -232,7 +197,6 @@ class ClimateModbus:
 
 
     def has_valid_register(self, index):
-        """检查每个功能项在给定索引上是否都有可用寄存器。"""
         for prop in self.regs:
             registers = self.regs[prop].get(CONF_REGISTERS)
             if not registers or index >= len(registers):
@@ -240,91 +204,29 @@ class ClimateModbus:
         return True
 
     def reset(self):
-        _LOGGER.warning("Skip raw reset on %s", self.hub._client)
+        _LOGGER.warning("Reset %s", self.hub._client)
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(5)
+        s.connect((self.hub._pb_params["host"], self.hub._pb_params["port"]))
+        s.sendall(b"\x55\xAA\x55\x00\x25\x80\x03\xA8")
+        s.close()
 
     async def reconnect(self, now=None):
-        """调度执行 hub 重连，并设置下一次可重连时间。"""
         _LOGGER.warning("Reconnect %s", self.hub._client)
-        try:
-            async with self._io_lock:
-                await self.hub.async_restart()
-        except Exception as err:
-            _LOGGER.warning("Reconnect failed on %s: %s", self.hub_name, err)
-        finally:
-            self._reconnect_pending = False
-            self._next_reconnect_at = time.monotonic() + 15
-
-    def ensure_status_sensor(self, name):
-        """确保轮询状态传感器仅加载一次。"""
-        if self._poll_runtime.sensor_loaded:
-            return
-
-        self._poll_runtime.sensor_loaded = True
-        from homeassistant.helpers import discovery
-
-        discovery.load_platform(
-            self.hass,
-            "sensor",
-            DOMAIN,
-            {CONF_HUB: self.hub_name, CONF_NAME: name},
-            {},
-        )
-
-    def should_poll(self):
-        if not self._poll_runtime.poll_paused:
-            return True
-
-        now = time.monotonic()
-        # 暂停轮询期间，仅在到达重试窗口后放行一次探测请求。
-        if now < self._poll_runtime.next_poll_retry_at or self._poll_probe_in_progress:
-            return False
-
-        self._poll_probe_in_progress = True
-        return True
-
-    def finish_poll_attempt(self):
-        if self._poll_probe_in_progress:
-            self._poll_probe_in_progress = False
-
-    def mark_poll_success(self):
-        # 任意一次读成功即视为链路恢复，清空熔断与退避状态。
-        if self._poll_runtime.poll_paused:
-            _LOGGER.warning("Modbus communication recovered on %s, resume polling", self.hub_name)
-        self._poll_runtime.poll_paused = False
-        self._poll_runtime.next_poll_retry_at = 0.0
-        self._poll_runtime.next_poll_retry_wall = None
-        self._poll_runtime.last_recovered_at = datetime.now()
-        self._poll_runtime.error_count = 0
-        self.error = 0
+        await self.hub.async_restart()
 
     def exception(self):
+        turns = int(self.error / self.count)
         self.error += 1
-        now = time.monotonic()
-        # 线性退避：失败次数越多重试间隔越长，但不超过上限。
-        delay = min(self._max_poll_retry_seconds, self._poll_retry_seconds * max(1, self.error))
-
-        if not self._poll_runtime.poll_paused:
-            _LOGGER.warning(
-                "Modbus communication failed on %s, pause polling and retry in %ss",
-                self.hub_name,
-                delay,
-            )
-
-        self._poll_runtime.poll_paused = True
-        self._poll_runtime.error_count = self.error
-        self._poll_runtime.next_poll_retry_at = now + delay
-        self._poll_runtime.next_poll_retry_wall = datetime.now() + timedelta(seconds=delay)
-        self._poll_runtime.last_error_at = datetime.now()
-
-        if self._reconnect_pending or now < self._next_reconnect_at:
+        if turns != 0 and (turns > 6 and turns % 10):
             return
-
-        self._reconnect_pending = True
+        if turns % 3 == 0:
+            self.reset()
         from homeassistant.helpers.event import async_call_later
-        async_call_later(self.hass, 2, self.reconnect)
+        async_call_later(self.hass, 1, self.reconnect)
 
     def reg_basic_info(self, reg, index):
-        """提取寄存器访问所需的基础参数。"""
         register_type = reg.get(CONF_REGISTER_TYPE)
         register = reg[CONF_REGISTER] if index == -1 else reg[CONF_REGISTERS][index]
         slave = reg.get(CONF_SLAVE, 1)
@@ -333,20 +235,18 @@ class ClimateModbus:
         return (register_type, slave, register, scale, offset)
 
     async def read_value(self, index, prop):
-        """从 Modbus 读取指定属性并按 scale/offset 转换。"""
         reg = self.regs[prop]
         register_type, slave, register, scale, offset = self.reg_basic_info(reg, index)
         count = reg.get(CONF_COUNT, 1)
 
-        async with self._io_lock:
-            if register_type == REGISTER_TYPE_COIL:
-                result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_COIL)
-                return bool(result.bits[0])
+        if register_type == REGISTER_TYPE_COIL:
+            result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_COIL)
+            return bool(result.bits[0])
 
-            if register_type == REGISTER_TYPE_INPUT:
-                result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_INPUT)
-            else:
-                result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_HOLDING)
+        if register_type == REGISTER_TYPE_INPUT:
+            result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_INPUT)
+        else:
+            result = await self.hub.async_pb_call(slave, register, count, CALL_TYPE_REGISTER_HOLDING)
 
         registers = result.registers
         if reg.get(CONF_REVERSE_ORDER):
@@ -357,41 +257,37 @@ class ClimateModbus:
         return scale * val + offset
 
     async def write_value(self, index, prop, value):
-        """向 Modbus 写入指定属性值。"""
         reg = self.regs[prop]
         register_type, slave, register, scale, offset = self.reg_basic_info(reg, index)
 
-        async with self._io_lock:
-            if register_type == REGISTER_TYPE_COIL:
-                await self.hass.services.async_call(
-                    "modbus",
-                    "write_coil",
-                    {
-                        "hub": self.hub_name,
-                        "slave": slave,
-                        "address": register,
-                        "state": bool(value),
-                    },
-                    blocking=True,
-                )
-            else:
-                val = int((value - offset) / scale)
-                await self.hass.services.async_call(
-                    "modbus",
-                    "write_register",
-                    {
-                        "hub": self.hub_name,
-                        "slave": slave,
-                        "address": register,
-                        "value": [val],
-                    },
-                    blocking=True,
-                )
+        if register_type == REGISTER_TYPE_COIL:
+            await self.hass.services.async_call(
+                "modbus",
+                "write_coil",
+                {
+                    "hub": self.hub_name,
+                    "slave": slave,
+                    "address": register,
+                    "state": bool(value),
+                },
+                blocking=True,
+            )
+        else:
+            val = int((value - offset) / scale)
+            await self.hass.services.async_call(
+                "modbus",
+                "write_register",
+                {
+                    "hub": self.hub_name,
+                    "slave": slave,
+                    "address": register,
+                    "value": [val],
+                },
+                blocking=True,
+            )
 
 
 class ZhiModbusClimate(ClimateEntity):
-    """Home Assistant 温控实体实现。"""
-
     _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, bus, name, index=-1):
@@ -413,7 +309,6 @@ class ZhiModbusClimate(ClimateEntity):
         self._attr_supported_features = features
 
     def _pending_valid(self, until_value):
-        """判断写入后的临时状态是否仍在有效期。"""
         return until_value is not None and datetime.now() < until_value
 
     def _set_pending_hvac(self, mode):
@@ -445,7 +340,6 @@ class ZhiModbusClimate(ClimateEntity):
     def target_temperature(self):
         real_value = self.get_value(REG_TARGET_TEMPERATURE)
         pending_value = self._pending_target_temperature
-        # 写入后短时间优先展示 pending 值，避免设备回读延迟引起界面跳变。
         if pending_value is not None and self._pending_valid(self._pending_target_temperature_until):
             if real_value == pending_value:
                 self._pending_target_temperature = None
@@ -488,7 +382,6 @@ class ZhiModbusClimate(ClimateEntity):
                 real_mode = hvac_mode
 
         pending_mode = self._pending_hvac_mode
-        # 模式切换后短时间优先展示 pending 值，提升交互一致性。
         if pending_mode is not None and self._pending_valid(self._pending_hvac_until):
             if real_mode == pending_mode:
                 self._pending_hvac_mode = None
@@ -550,7 +443,6 @@ class ZhiModbusClimate(ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode):
         if REG_HVAC_OFF in self._bus.regs:
-            # 兼容部分设备使用独立开关寄存器控制开/关机。
             await self.set_value(
                 REG_HVAC_OFF,
                 self._bus.hvac_off_value if hvac_mode == HVACMode.OFF else self._bus.hvac_on_value,
@@ -633,27 +525,19 @@ class ZhiModbusClimate(ClimateEntity):
             _LOGGER.debug("Skip update on %s", self._name)
             return
 
-        # 通讯不稳定时由总线熔断机制节流轮询，避免持续刷错。
-        if not self._bus.should_poll():
-            self._attr_available = False
-            return
+        for prop in self._bus.regs:
+            if prop == REG_FAN_MODE:
+                continue
 
-        try:
-            for prop in self._bus.regs:
-                if prop == REG_FAN_MODE:
-                    continue
-
+            try:
                 self._values[prop] = await self._bus.read_value(self._index, prop)
-        except Exception:
-            self._attr_available = False
-            self._bus.exception()
-            _LOGGER.debug("Exception %d on %s", self._bus.error, self._name)
-            return
-        finally:
-            # 无论成功或失败都释放探测状态，避免后续重试被阻塞。
-            self._bus.finish_poll_attempt()
+            except Exception:
+                self._attr_available = False
+                self._bus.exception()
+                _LOGGER.debug("Exception %d on %s/%s", self._bus.error, self._name, prop)
+                return
 
-        self._bus.mark_poll_success()
+        self._bus.error = 0
         self._attr_available = True
 
     def get_value(self, prop):
