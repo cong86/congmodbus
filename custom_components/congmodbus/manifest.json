@@ -3,7 +3,7 @@
   "name": "Cong Modbus Climate",
   "documentation": "https://github.com/cong86/congmodbus",
   "issue_tracker": "https://github.com/cong86/congmodbus/issues",
-  "version": "1.0.2",
+  "version": "1.1.1",
   "requirements": [],
   "dependencies": ["modbus"],
   "codeowners": ["@cong86"]
