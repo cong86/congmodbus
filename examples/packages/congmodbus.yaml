@@ -1,0 +1,208 @@
+# CongModbus 核心恢复配置
+# 现场参数：格力 BMS 网关 192.168.1.100:502，Modbus slave 2
+# 如网关 IP 发生变化，只需修改下面的 host。
+
+modbus:
+  - name: gree_bms
+    type: tcp
+    host: 192.168.1.100
+    port: 502
+    delay: 0
+    timeout: 3
+    message_wait_milliseconds: 50
+    # HA 2026.8 要求 YAML Modbus Hub 至少包含一个原生实体，否则拒绝加载。
+    # 该低频传感器同时作为 Hub 存活检查；空调控制仍由 congmodbus 完成。
+    sensors:
+      - name: "格力Hub保活"
+        unique_id: gree_hub_keepalive
+        slave: 2
+        address: 328
+        input_type: holding
+        data_type: uint16
+        scan_interval: 300
+
+climate:
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机10"
+    hvac_modes: &gree_hvac_modes
+      cool: 1
+      dry: 2
+      fan_only: 3
+      heat: 4
+      auto: 5
+    fan_modes: &gree_fan_modes
+      auto: 1
+      low: 2
+      medium: 4
+      high: 6
+      强劲档: 7
+    hvac_off_value: 85
+    hvac_on_value: 170
+    hvac_off:
+      register: 327
+      register_type: holding
+      slave: 2
+      data_type: uint
+    hvac_mode:
+      register: 328
+      register_type: holding
+      slave: 2
+      data_type: uint
+    target_temperature:
+      register: 329
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+    fan_mode:
+      register: 330
+      register_type: holding
+      slave: 2
+      data_type: uint
+    temperature:
+      register: 341
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机20"
+    hvac_modes: *gree_hvac_modes
+    fan_modes: *gree_fan_modes
+    hvac_off_value: 85
+    hvac_on_value: 170
+    hvac_off:
+      register: 577
+      register_type: holding
+      slave: 2
+      data_type: uint
+    hvac_mode:
+      register: 578
+      register_type: holding
+      slave: 2
+      data_type: uint
+    target_temperature:
+      register: 579
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+    fan_mode:
+      register: 580
+      register_type: holding
+      slave: 2
+      data_type: uint
+    temperature:
+      register: 591
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机30"
+    hvac_modes: *gree_hvac_modes
+    fan_modes: *gree_fan_modes
+    hvac_off_value: 85
+    hvac_on_value: 170
+    hvac_off:
+      register: 827
+      register_type: holding
+      slave: 2
+      data_type: uint
+    hvac_mode:
+      register: 828
+      register_type: holding
+      slave: 2
+      data_type: uint
+    target_temperature:
+      register: 829
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+    fan_mode:
+      register: 830
+      register_type: holding
+      slave: 2
+      data_type: uint
+    temperature:
+      register: 841
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机40"
+    hvac_modes: *gree_hvac_modes
+    fan_modes: *gree_fan_modes
+    hvac_off_value: 85
+    hvac_on_value: 170
+    hvac_off:
+      register: 1077
+      register_type: holding
+      slave: 2
+      data_type: uint
+    hvac_mode:
+      register: 1078
+      register_type: holding
+      slave: 2
+      data_type: uint
+    target_temperature:
+      register: 1079
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+    fan_mode:
+      register: 1080
+      register_type: holding
+      slave: 2
+      data_type: uint
+    temperature:
+      register: 1091
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机50"
+    hvac_modes: *gree_hvac_modes
+    fan_modes: *gree_fan_modes
+    hvac_off_value: 85
+    hvac_on_value: 170
+    hvac_off:
+      register: 1327
+      register_type: holding
+      slave: 2
+      data_type: uint
+    hvac_mode:
+      register: 1328
+      register_type: holding
+      slave: 2
+      data_type: uint
+    target_temperature:
+      register: 1329
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
+    fan_mode:
+      register: 1330
+      register_type: holding
+      slave: 2
+      data_type: uint
+    temperature:
+      register: 1341
+      register_type: holding
+      slave: 2
+      scale: 0.1
+      data_type: uint
