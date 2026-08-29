@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0 — 2026-08-29
+
+- ActualFanSpeedSensor 改为订阅 Climate 的共享风速读值，不再重复访问 Modbus。
+- 实际风速实体跟随共享轮询熔断状态，在通信失败时正确标记 unavailable。
+- Climate 使用 Home Assistant RestoreEntity 恢复上次风速设定和开机模式。
+- 保持既有实体名称、unique_id 和 YAML 配置兼容。
+- 修正示例 Package 中 5 台室内机的实际风速 Sensor 地址。
+
+## 1.2.0 — 2026-08-29
+
+- Climate 增加实际风速轮询和读写枚举转换。
+- 增加 ActualFanSpeedSensor，区分风速设定与实际运行档位。
+- 增加风速写入后的 pending 乐观更新。
+
 ## 1.1.1 — 2026-08-14
 
 - 修正 `manifest.json` 版本号，使其与 GitHub Release 一致。

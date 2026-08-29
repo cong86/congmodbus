@@ -1,7 +1,7 @@
 # Cong Modbus Climate
 
 用于 Home Assistant 的 Modbus 空调自定义组件。当前配置已经在格力水多联机、
-Modbus TCP 网关以及 Home Assistant 2026.8.1 环境中验证。
+Modbus TCP 网关以及 Home Assistant 2026.8.3 环境中验证。
 
 ## 功能
 
@@ -9,6 +9,8 @@ Modbus TCP 网关以及 Home Assistant 2026.8.1 环境中验证。
 - 制冷、制热、除湿、送风和自动模式
 - 目标温度设置与当前温度读取
 - 风速控制
+- 独立展示实际运行风速，并复用 Climate 的同一次寄存器读取
+- 重启后恢复上次已知的风速设定，避免自动档和关机缓存丢失
 - 同一 Modbus Hub 共享 I/O 锁，避免并发读写冲突
 - 通信失败后暂停轮询、退避重试和自动重连
 - YAML 重载后的旧实例隔离与连接保护
@@ -111,6 +113,7 @@ GitHub Release 附件提供 `congmodbus-recovery-v1.1.1.zip`，其中包含组�
 - 这是自定义集成，Home Assistant 会显示“未经测试的自定义集成”提示，属于正常现象。
 - 轮询状态传感器在已有实体注册表中可能带 `_2` 后缀；全新安装时可能不带后缀。
 - `domain`、空调名称和 `unique_id` 生成规则保持不变，以兼容已有仪表盘和自动化。
+- 同一风速寄存器读取时返回的是实际运行档位，不能直接证明设备当前的设定档位；组件通过 HA RestoreEntity 恢复上次已知设定，独立 Sensor 展示实际档位。
 
 ## 问题反馈
 

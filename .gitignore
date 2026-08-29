@@ -1,5 +1,8 @@
 __pycache__/
 *.py[cod]
+*.bak
+*.bak-*
+*.bak[0-9]*
 *.log
 .DS_Store
 .idea/

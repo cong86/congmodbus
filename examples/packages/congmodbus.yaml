@@ -206,3 +206,31 @@ climate:
       slave: 2
       scale: 0.1
       data_type: uint
+
+# 实际运行风速复用对应 Climate 的风速轮询结果，不会增加 Modbus 请求。
+sensor:
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机10实际风速"
+    slave: 2
+    register: 330
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机20实际风速"
+    slave: 2
+    register: 580
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机30实际风速"
+    slave: 2
+    register: 830
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机40实际风速"
+    slave: 2
+    register: 1080
+  - platform: congmodbus
+    hub: gree_bms
+    name: "格力内机50实际风速"
+    slave: 2
+    register: 1330

@@ -20,6 +20,7 @@ from homeassistant.components.modbus.const import (
     CALL_TYPE_COIL, CALL_TYPE_REGISTER_HOLDING, CALL_TYPE_REGISTER_INPUT,
 )
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .runtime import get_polling_runtime
 
@@ -551,8 +552,20 @@ class ClimateModbus:
                     blocking=True,
                 )
 
+    def publish_actual_fan_speed(self, index, raw_value):
+        """Share the Climate fan-speed read with non-polling sensor entities."""
+        reg = self.regs.get(REG_FAN_MODE)
+        if reg is None:
+            return
+        _register_type, slave, register, _scale, _offset = self.reg_basic_info(reg, index)
+        self._poll_runtime.publish_fan_speed(slave, register, raw_value)
 
-class CongModbusClimate(ClimateEntity):
+    def mark_actual_fan_speeds_unavailable(self):
+        """Propagate a shared hub polling failure to actual fan-speed sensors."""
+        self._poll_runtime.mark_fan_speeds_unavailable()
+
+
+class CongModbusClimate(RestoreEntity, ClimateEntity):
     """Home Assistant 温控实体实现。"""
 
     _enable_turn_on_off_backwards_compatibility = False
@@ -577,6 +590,20 @@ class CongModbusClimate(ClimateEntity):
         for prop in self._bus.regs:
             features |= SUPPORTED_FEATURES[prop]
         self._attr_supported_features = features
+
+    async def async_added_to_hass(self):
+        """Restore the last known fan setting that cannot be inferred from actual speed."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is None:
+            return
+
+        restored_fan_mode = last_state.attributes.get("fan_mode")
+        if restored_fan_mode in self._bus.fan_modes:
+            self._fan_mode = restored_fan_mode
+
+        if last_state.state in self._bus.hvac_modes:
+            self._last_on_operation = last_state.state
 
     def _pending_valid(self, until_value):
         """判断写入后的临时状态是否仍在有效期。"""
@@ -828,10 +855,12 @@ class CongModbusClimate(ClimateEntity):
             for prop in props:
                 value = await self._bus.read_value(self._index, prop)
                 if prop == REG_FAN_MODE:
+                    self._bus.publish_actual_fan_speed(self._index, value)
                     self._update_fan_mode(value)
                 self._values[prop] = value
         except Exception:
             self._attr_available = False
+            self._bus.mark_actual_fan_speeds_unavailable()
             self._bus.exception()
             _LOGGER.debug("Exception %d on %s", self._bus.error, self._name)
             return

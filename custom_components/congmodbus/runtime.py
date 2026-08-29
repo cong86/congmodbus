@@ -1,6 +1,7 @@
 """Shared runtime state for congmodbus entities."""
 
 import time
+from datetime import datetime
 
 
 RUNTIME_STORE_KEY = "congmodbus_poll_runtime"
@@ -34,6 +35,12 @@ class PollingRuntime:
         self.warmup_until = 0.0
         self.suppress_warning_until = 0.0
 
+        # Climate entities are the single source of Modbus fan-speed reads.
+        # ActualFanSpeedSensor entities subscribe to these cached samples so
+        # they do not issue duplicate requests or bypass polling backoff.
+        self._fan_speed_samples = {}
+        self._fan_speed_listeners = {}
+
     def retry_in_seconds(self):
         if not self.poll_paused:
             return 0
@@ -44,6 +51,62 @@ class PollingRuntime:
         if not self.manual_polling_enabled:
             return "手动关闭"
         return "停止" if self.poll_paused else "运行"
+
+    @staticmethod
+    def _fan_speed_key(slave, register):
+        return (int(slave), int(register))
+
+    def get_fan_speed_sample(self, slave, register):
+        """Return the latest cached fan-speed sample, if any."""
+        return self._fan_speed_samples.get(self._fan_speed_key(slave, register))
+
+    def add_fan_speed_listener(self, slave, register, listener):
+        """Subscribe to cached fan-speed changes and return an unsubscribe callback."""
+        key = self._fan_speed_key(slave, register)
+        listeners = self._fan_speed_listeners.setdefault(key, set())
+        listeners.add(listener)
+
+        def remove_listener():
+            current = self._fan_speed_listeners.get(key)
+            if current is None:
+                return
+            current.discard(listener)
+            if not current:
+                self._fan_speed_listeners.pop(key, None)
+
+        return remove_listener
+
+    def publish_fan_speed(self, slave, register, raw_value):
+        """Publish a successful fan-speed read to subscribed sensor entities."""
+        key = self._fan_speed_key(slave, register)
+        previous = self._fan_speed_samples.get(key)
+        sample = {
+            "raw_value": raw_value,
+            "available": True,
+            "updated_at": datetime.now().astimezone(),
+        }
+        self._fan_speed_samples[key] = sample
+
+        if (
+            previous is None
+            or not previous.get("available", False)
+            or previous.get("raw_value") != raw_value
+        ):
+            self._notify_fan_speed_listeners(key, sample)
+
+    def mark_fan_speeds_unavailable(self):
+        """Mark cached fan speeds unavailable when the shared hub poll fails."""
+        for key, previous in list(self._fan_speed_samples.items()):
+            if not previous.get("available", False):
+                continue
+            sample = dict(previous)
+            sample["available"] = False
+            self._fan_speed_samples[key] = sample
+            self._notify_fan_speed_listeners(key, sample)
+
+    def _notify_fan_speed_listeners(self, key, sample):
+        for listener in tuple(self._fan_speed_listeners.get(key, ())):
+            listener(sample)
 
 
 def get_polling_runtime(hass, hub_name):

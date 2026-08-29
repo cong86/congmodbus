@@ -1,24 +1,16 @@
 """Sensors for congmodbus: polling status and per-unit actual fan speed."""
 
-import asyncio
-import logging
 from datetime import timedelta
 
 import voluptuous as vol
 
-from homeassistant.components.modbus.const import (
-    DEFAULT_HUB,
-    MODBUS_DOMAIN,
-    CALL_TYPE_REGISTER_HOLDING,
-)
+from homeassistant.components.modbus.const import DEFAULT_HUB
 from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.const import CONF_NAME, CONF_SLAVE
 import homeassistant.helpers.config_validation as cv
 
 from .runtime import get_polling_runtime
 
-
-_LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(seconds=10)
 DEFAULT_NAME = "ModBus Polling"
@@ -124,12 +116,13 @@ class CongModbusPollingSensor(SensorEntity):
 
 
 class ActualFanSpeedSensor(SensorEntity):
-    """读取格力 Word 105 实际风速寄存器（01-0B 厂商映射）。
+    """展示 Climate 轮询得到的 Word 105 实际风速（01-0B 厂商映射）。
 
-    与 climate 的 fan_mode 设定值(Word 104)相互独立：
-    climate 负责写入风速设定，本传感器只读实际运行风速。
-    所有读取复用组件的 I/O 锁，避免与 climate 轮询并发。
+    与 climate 的 fan_mode 设定值相互独立，但不重复访问 Modbus：
+    Climate 是唯一读取者，本传感器订阅共享运行时缓存。
     """
+
+    _attr_should_poll = False
 
     def __init__(self, hass, hub_name, name, slave, register):
         self.hass = hass
@@ -139,6 +132,10 @@ class ActualFanSpeedSensor(SensorEntity):
         self._register = register
         self._state = None
         self._raw_value = None
+        self._last_update = None
+        self._remove_listener = None
+        self._runtime = get_polling_runtime(hass, hub_name)
+        self._attr_available = False
 
     @property
     def name(self):
@@ -165,31 +162,31 @@ class ActualFanSpeedSensor(SensorEntity):
             "slave": self._slave,
             "register": self._register,
             "raw_value": self._raw_value,
+            "source": "climate_shared_poll",
+            "last_update": self._last_update.isoformat() if self._last_update else None,
         }
 
-    async def async_update(self):
-        """每 SCAN_INTERVAL 读取一次实际风速寄存器。"""
-        hub = self.hass.data.get(MODBUS_DOMAIN, {}).get(self._hub_name)
-        if hub is None:
-            _LOGGER.warning("Actual fan speed %s: modbus hub %s not found", self._name, self._hub_name)
-            self._state = "不可用"
-            return
-
-        # 复用 climate 组件的 I/O 锁，避免与现有 20 个轮询请求并发
-        lock = self.hass.data.setdefault("congmodbus_io_locks", {}).setdefault(
-            self._hub_name, asyncio.Lock()
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        sample = self._runtime.get_fan_speed_sample(self._slave, self._register)
+        if sample is not None:
+            self._apply_sample(sample)
+        self._remove_listener = self._runtime.add_fan_speed_listener(
+            self._slave, self._register, self._handle_sample
         )
-        try:
-            async with lock:
-                result = await hub.async_pb_call(
-                    self._slave, self._register, 1, CALL_TYPE_REGISTER_HOLDING
-                )
-            value = result.registers[0]
-            self._raw_value = value
-            self._state = ACTUAL_FAN_SPEED_MAP.get(value, FAN_SPEED_UNKNOWN)
-        except Exception as err:
-            _LOGGER.warning(
-                "Actual fan speed %s (reg %d) read failed: %s",
-                self._name, self._register, err,
-            )
-            self._state = "不可用"
+
+    async def async_will_remove_from_hass(self):
+        if self._remove_listener is not None:
+            self._remove_listener()
+            self._remove_listener = None
+        await super().async_will_remove_from_hass()
+
+    def _handle_sample(self, sample):
+        self._apply_sample(sample)
+        self.async_write_ha_state()
+
+    def _apply_sample(self, sample):
+        self._attr_available = bool(sample.get("available"))
+        self._raw_value = sample.get("raw_value")
+        self._last_update = sample.get("updated_at")
+        self._state = ACTUAL_FAN_SPEED_MAP.get(self._raw_value, FAN_SPEED_UNKNOWN)
