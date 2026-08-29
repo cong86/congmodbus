@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1 — 2026-08-29
+
+- 修复 RestoreEntity 恢复为 auto 后，线控器物理改为低/中/高档时 Climate 不更新的问题。
+- 有效实际风速读值现在会覆盖旧的 auto 缓存；写入后的 20 秒 pending 保护保持不变。
+- 风机停、超低速、静音档和未配置档位仍保持 Climate 旧值，由独立实际风速 Sensor 展示完整状态。
+
 ## 1.3.0 — 2026-08-29
 
 - ActualFanSpeedSensor 改为订阅 Climate 的共享风速读值，不再重复访问 Modbus。

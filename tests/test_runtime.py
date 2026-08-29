@@ -15,6 +15,7 @@ SPEC = importlib.util.spec_from_file_location("congmodbus_runtime", RUNTIME_PATH
 RUNTIME_MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RUNTIME_MODULE)
 PollingRuntime = RUNTIME_MODULE.PollingRuntime
+resolve_fan_mode_from_actual = RUNTIME_MODULE.resolve_fan_mode_from_actual
 
 
 class PollingRuntimeFanSpeedTest(unittest.TestCase):
@@ -46,6 +47,15 @@ class PollingRuntimeFanSpeedTest(unittest.TestCase):
         self.remove_listener()
         self.runtime.publish_fan_speed(2, 330, 8)
         self.assertEqual([], self.events)
+
+    def test_physical_low_speed_replaces_restored_auto(self):
+        modes = {"auto": 1, "low": 2, "medium": 4, "high": 6, "强劲档": 7}
+        self.assertEqual("low", resolve_fan_mode_from_actual("auto", 3, modes))
+
+    def test_unmapped_actual_speed_keeps_current_mode(self):
+        modes = {"auto": 1, "low": 2, "medium": 4, "high": 6, "强劲档": 7}
+        self.assertEqual("auto", resolve_fan_mode_from_actual("auto", 1, modes))
+        self.assertEqual("high", resolve_fan_mode_from_actual("high", 9, modes))
 
 
 if __name__ == "__main__":

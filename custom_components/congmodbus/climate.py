@@ -22,7 +22,7 @@ from homeassistant.components.modbus.const import (
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .runtime import get_polling_runtime
+from .runtime import get_polling_runtime, resolve_fan_mode_from_actual
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -881,25 +881,9 @@ class CongModbusClimate(RestoreEntity, ClimateEntity):
         self._pending_fan_mode = None
         self._pending_fan_mode_until = None
 
-        if raw_r is None:
-            return
-        r2w = {3:2, 4:3, 5:4, 6:5, 7:6, 8:7}
-        w_val = r2w.get(raw_r)
-        if w_val is None:
-            # 关机/风机停/无效值时保持上次缓存，避免线控器关机再开机后丢失auto状态
-            return
-        label = None
-        for k, v in self._bus.fan_modes.items():
-            if v == w_val:
-                label = k
-                break
-        if label is None:
-            # 中低档/中高档不在HA选项里，保持旧值不跳变
-            return
-        if self._fan_mode == "auto":
-            # 自动风模式下R编码返回实际档位，不覆盖缓存的auto
-            return
-        self._fan_mode = label
+        self._fan_mode = resolve_fan_mode_from_actual(
+            self._fan_mode, raw_r, self._bus.fan_modes
+        )
 
     def get_value(self, prop):
         return self._values.get(prop)

@@ -5,6 +5,27 @@ from datetime import datetime
 
 
 RUNTIME_STORE_KEY = "congmodbus_poll_runtime"
+FAN_READ_TO_WRITE = {3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7}
+
+
+def resolve_fan_mode_from_actual(current_mode, raw_value, configured_modes):
+    """Map an actual-speed read to a configured Climate fan mode.
+
+    The gateway does not expose whether the controller setting is auto. A
+    valid actual-speed change must therefore replace a previously restored
+    auto value so physical controller changes remain visible in Home Assistant.
+    Unmapped values (fan stopped, ultra-low and silent speeds) keep the current
+    Climate value while the dedicated actual-speed sensor still shows them.
+    """
+    write_value = FAN_READ_TO_WRITE.get(raw_value)
+    if write_value is None:
+        return current_mode
+
+    for label, configured_value in configured_modes.items():
+        if configured_value == write_value:
+            return label
+
+    return current_mode
 
 
 class PollingRuntime:
