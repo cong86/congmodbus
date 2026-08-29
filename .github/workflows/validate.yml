@@ -27,4 +27,6 @@ jobs:
         uses: hacs/action@main
         with:
           category: integration
-          ignore: brands
+          # The repository owner has not selected an open-source license.
+          # Ignore that publication-policy check without implying a license.
+          ignore: brands license
