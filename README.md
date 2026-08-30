@@ -17,6 +17,7 @@ Modbus TCP 网关以及 Home Assistant 2026.8.3 环境中验证。
 - 通信失败后暂停轮询、退避重试和自动重连
 - YAML 重载后的旧实例隔离与连接保护
 - 自动生成轮询状态传感器和轮询控制开关
+- 在 Home Assistant 集成页面显示 Cong Modbus Climate 品牌图标
 
 ## 安装
 
