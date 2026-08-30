@@ -49,8 +49,18 @@ class PollingRuntimeFanSpeedTest(unittest.TestCase):
         self.assertEqual([], self.events)
 
     def test_physical_low_speed_replaces_restored_auto(self):
-        modes = {"auto": 1, "low": 2, "medium": 4, "high": 6, "强劲档": 7}
+        modes = {
+            "auto": 1,
+            "low": 2,
+            "中低档": 3,
+            "medium": 4,
+            "中高档": 5,
+            "high": 6,
+            "强劲档": 7,
+        }
         self.assertEqual("low", resolve_fan_mode_from_actual("auto", 3, modes))
+        self.assertEqual("中低档", resolve_fan_mode_from_actual("low", 4, modes))
+        self.assertEqual("中高档", resolve_fan_mode_from_actual("medium", 6, modes))
 
     def test_unmapped_actual_speed_keeps_current_mode(self):
         modes = {"auto": 1, "low": 2, "medium": 4, "high": 6, "强劲档": 7}

@@ -34,7 +34,9 @@ climate:
     fan_modes: &gree_fan_modes
       auto: 1
       low: 2
+      中低档: 3
       medium: 4
+      中高档: 5
       high: 6
       强劲档: 7
     hvac_off_value: 85

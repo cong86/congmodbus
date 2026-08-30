@@ -116,10 +116,10 @@ class CongModbusPollingSensor(SensorEntity):
 
 
 class ActualFanSpeedSensor(SensorEntity):
-    """展示 Climate 轮询得到的 Word 105 实际风速（01-0B 厂商映射）。
+    """展示 Climate 快速轮询得到的 Word 105 实际风速（01-0B 厂商映射）。
 
     与 climate 的 fan_mode 设定值相互独立，但不重复访问 Modbus：
-    Climate 是唯一读取者，本传感器订阅共享运行时缓存。
+    Climate 的 4 秒专用任务是唯一读取者，本传感器订阅共享运行时缓存。
     """
 
     _attr_should_poll = False
@@ -162,7 +162,7 @@ class ActualFanSpeedSensor(SensorEntity):
             "slave": self._slave,
             "register": self._register,
             "raw_value": self._raw_value,
-            "source": "climate_shared_poll",
+            "source": "climate_fast_poll",
             "last_update": self._last_update.isoformat() if self._last_update else None,
         }
 

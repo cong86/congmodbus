@@ -21,12 +21,14 @@ from homeassistant.components.modbus.const import (
 )
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.event import async_track_time_interval
 
 from .runtime import get_polling_runtime, resolve_fan_mode_from_actual
 
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=10)
+FAN_SCAN_INTERVAL = timedelta(seconds=4)
 PARALLEL_UPDATES = 1
 PENDING_SECONDS = 20
 # 通讯失败后的重试基准秒数与最大退避上限。
@@ -369,6 +371,15 @@ class ClimateModbus:
     def polling_enabled(self):
         return self._poll_runtime.manual_polling_enabled
 
+    def fast_fan_poll_allowed(self):
+        """Allow fast fan reads only while the shared hub is fully healthy."""
+        return (
+            self._poll_runtime.manual_polling_enabled
+            and self._generation == self._poll_runtime.generation
+            and not self._poll_runtime.poll_paused
+            and time.monotonic() >= self._poll_runtime.warmup_until
+        )
+
     def should_poll(self):
         if not self._poll_runtime.manual_polling_enabled:
             return False
@@ -594,6 +605,13 @@ class CongModbusClimate(RestoreEntity, ClimateEntity):
     async def async_added_to_hass(self):
         """Restore the last known fan setting that cannot be inferred from actual speed."""
         await super().async_added_to_hass()
+        if REG_FAN_MODE in self._bus.regs:
+            self.async_on_remove(
+                async_track_time_interval(
+                    self.hass, self._async_fast_fan_update, FAN_SCAN_INTERVAL
+                )
+            )
+
         last_state = await self.async_get_last_state()
         if last_state is None:
             return
@@ -847,7 +865,8 @@ class CongModbusClimate(RestoreEntity, ClimateEntity):
             return
 
         try:
-            props = list(self._bus.regs)
+            # 风速由 4 秒专用任务读取，其余属性继续使用 10 秒完整轮询。
+            props = [prop for prop in self._bus.regs if prop != REG_FAN_MODE]
             if self._bus.in_probe_mode():
                 probe_prop = self._bus.probe_prop()
                 props = [probe_prop] if probe_prop is not None else []
@@ -870,6 +889,28 @@ class CongModbusClimate(RestoreEntity, ClimateEntity):
 
         self._bus.mark_poll_success()
         self._attr_available = True
+
+    async def _async_fast_fan_update(self, now=None):
+        """Read only Word 105 on a faster cadence without bypassing safeguards."""
+        if not self._bus.fast_fan_poll_allowed():
+            return
+
+        old_raw_value = self._values.get(REG_FAN_MODE)
+        old_fan_mode = self._fan_mode
+        try:
+            value = await self._bus.read_value(self._index, REG_FAN_MODE)
+            self._bus.publish_actual_fan_speed(self._index, value)
+            self._update_fan_mode(value)
+            self._values[REG_FAN_MODE] = value
+        except Exception:
+            self._attr_available = False
+            self._bus.mark_actual_fan_speeds_unavailable()
+            self._bus.exception()
+            _LOGGER.debug("Fast fan poll failed on %s", self._name)
+            return
+
+        if old_raw_value != value or old_fan_mode != self._fan_mode:
+            self.async_write_ha_state()
 
     def _update_fan_mode(self, raw_r):
         """根据R编码读回值智能更新fan_mode缓存。
