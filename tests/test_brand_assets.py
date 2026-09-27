@@ -40,9 +40,12 @@ class BrandAssetsTest(unittest.TestCase):
         self.assertEqual(tracked, set(expected))
 
         for relative_path, digest in expected.items():
-            actual = hashlib.sha256(
-                (REPOSITORY_PATH / relative_path).read_bytes()
-            ).hexdigest()
+            data = (REPOSITORY_PATH / relative_path).read_bytes()
+            # Git for Windows may check text files out with CRLF while release
+            # archives and Linux CI contain the canonical LF bytes.
+            if pathlib.Path(relative_path).suffix != ".png":
+                data = data.replace(b"\r\n", b"\n")
+            actual = hashlib.sha256(data).hexdigest()
             self.assertEqual(digest, actual, relative_path)
 
 

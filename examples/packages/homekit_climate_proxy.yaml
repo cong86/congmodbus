@@ -1,0 +1,17 @@
+# HomeKit uses these proxy entities; the original congmodbus climates keep all six speeds.
+climate:
+  - platform: homekit_climate_proxy
+    name: 格力内机 10 HomeKit
+    source_entity_id: climate.ge_li_nei_ji_10
+  - platform: homekit_climate_proxy
+    name: 格力内机 20 HomeKit
+    source_entity_id: climate.ge_li_nei_ji_20
+  - platform: homekit_climate_proxy
+    name: 格力内机 30 HomeKit
+    source_entity_id: climate.ge_li_nei_ji_30
+  - platform: homekit_climate_proxy
+    name: 格力内机 40 HomeKit
+    source_entity_id: climate.ge_li_nei_ji_40
+  - platform: homekit_climate_proxy
+    name: 格力内机 50 HomeKit
+    source_entity_id: climate.ge_li_nei_ji_50

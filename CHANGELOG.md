@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5 — 2026-09-28
+
+- 增加可选的 HomeKit Climate Proxy，供中文七档风速配置映射为 HomeKit 的低、中、高三档；原始 Climate 和 Modbus 读写逻辑不变。
+- 增加五台格力室内机的代理 Package 示例及手动安装说明；HACS 仍只管理 `congmodbus` 主集成。
+- 文档记录已验证的 HomeKit Bridge `thermostat` 配置及五张卡片的显示结果；实际风速控制尚未做物理验收。
+- 主集成 manifest 版本更新为 `1.5`。
+- GitHub Release 附完整 ZIP，包含主组件、可选代理、Package 示例和文档。
+
 ## 1.4.1 — 2026-08-30
 
 - 补齐集成品牌图标的发布说明与 SHA-256 完整性清单。

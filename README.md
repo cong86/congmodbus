@@ -18,6 +18,7 @@ Modbus TCP 网关以及 Home Assistant 2026.8.3 环境中验证。
 - YAML 重载后的旧实例隔离与连接保护
 - 自动生成轮询状态传感器和轮询控制开关
 - 在 Home Assistant 集成页面显示 Cong Modbus Climate 品牌图标
+- 可选的 HomeKit 三档风速代理，不改变原 Climate 的风速选项和 Modbus 轮询
 
 ## 安装
 
@@ -42,6 +43,43 @@ custom_components/congmodbus
 ```text
 /config/custom_components/congmodbus
 ```
+
+## 可选：HomeKit 风速代理（v1.5）
+
+HA 内的原始格力 Climate 可以保留自动和六个手动档位。若它们使用中文
+`fan_modes`，HomeKit Bridge 不一定会为直接桥接的空调显示风速入口。
+本仓库提供独立的 `homekit_climate_proxy`，只向 HomeKit 暴露 `low`、
+`medium`、`high` 三档，原 Climate 的实体 ID、档位和控制方式均不变。
+它订阅源实体状态，不增加 Modbus 轮询；只有用户操作代理实体时才调用
+源 Climate 的服务。映射关系如下：
+
+| HomeKit 显示 | 写入源实体 | 源实体读回后显示为该档 |
+| --- | --- | --- |
+| low | 低档 | 低档、中低档 |
+| medium | 中档 | 中档、中高档 |
+| high | 高档 | 高档、强劲档 |
+
+源实体为 `auto` 或 `fan_mode` 尚未确定时，代理不猜测具体档位。
+这个可选代理适用于上述中文档位配置；其他命名应先调整映射并验证。
+
+HACS 只管理本仓库的 `congmodbus` 集成，**不会自动安装可选代理**。
+`v1.5` GitHub Release 的 `congmodbus-v1.5-full.zip` 同时包含两个
+`custom_components` 目录、两个 Package 示例和本说明。手动安装步骤：
+
+1. 从仓库的 `extras/homekit_climate_proxy/`，或从完整 ZIP 的
+   `custom_components/homekit_climate_proxy/`，把代理文件复制到
+   `/config/custom_components/homekit_climate_proxy/`。
+2. 参考 `examples/packages/homekit_climate_proxy.yaml`，将五个
+   `source_entity_id` 改成现场原 Climate 实体 ID，放入已启用的 HA Packages。
+3. 运行 HA 配置检查，成功后重启 Core；确认代理实体在 HA 中可用。
+4. 创建一座 HomeKit Bridge，只包含这些代理 Climate；将各空调的
+   accessory type 设为 `thermostat`。这会发布温控与风扇服务。
+5. 在 Apple“家庭”配对新桥，逐台确认响应和风速入口。需要迁移房间、
+   场景或自动化引用时，先完成新卡片验证，再移除旧桥。
+
+2026-09-28 的现场验收限于五张新卡片正常响应、均出现风速入口；
+没有主动调节风速做物理控制验证。`thermostat` 类型是这次现场验证的
+必要配置；此前以 `heater_cooler` 类型发布时，iPhone 没有显示风速入口。
 
 ## 配置
 
